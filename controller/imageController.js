@@ -3,8 +3,9 @@ const axios = require('axios')
 
 exports.image = async (req, res) => {
     try {
-        const { userId, prompt } = req.body;
-        const user = await userModel.findOne({ userId });
+        const { prompt } = req.body;
+        const userId = req.user.id; // Use authenticated user from JWT
+        const user = await userModel.findById(userId);
 
         if (!user || !prompt) {
             return res.json({ success: false, message: "enter the required fields" });
@@ -13,36 +14,44 @@ exports.image = async (req, res) => {
             return res.json({ success: false, message: "insufficient balance" });
         }
 
-        // Gemini 2.0 Flash Preview endpoint
-        const apiKey = process.env.GEMINI_API_KEY;
-        const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+        // Stable Horde API call
+        const hordeApiKey = process.env.STABLE_HORDE_API_KEY;
+        const hordeEndpoint = "https://stablehorde.net/api/v2/generate/async";
 
-        // Gemini expects a specific payload structure
-        const geminiPayload = {
-            contents: [
-                {
-                    role: "user",
-                    parts: [
-                        {
-                            text: prompt
-                        }
-                    ]
-                }
-            ],
-            generationConfig: {
-                "response_mime_type": "image/png"
+        const hordePayload = {
+            prompt,
+            params: {
+                n: 1,
+                width: 512,
+                height: 512,
+                steps: 20,
+                sampler_name: "k_euler_ancestral"
             }
         };
 
-        const geminiResponse = await axios.post(geminiEndpoint, geminiPayload, {
-            headers: {
-                "Content-Type": "application/json"
-            }
-        });
+        const hordeHeaders = {
+            "Content-Type": "application/json",
+            "apikey": hordeApiKey
+        };
 
-        // The response will contain a base64-encoded image
-        // Adjust the path below based on the actual Gemini response structure
-        const imageBase64 = geminiResponse.data.candidates[0].content.parts[0].inlineData.data;
+        // Submit the generation request
+        const submitRes = await axios.post(hordeEndpoint, hordePayload, { headers: hordeHeaders });
+        const { id } = submitRes.data;
+
+        // Poll for the result (Stable Horde is async)
+        let imageBase64 = null;
+        for (let i = 0; i < 20; i++) {
+            await new Promise(r => setTimeout(r, 3000)); // wait 3 seconds
+            const pollRes = await axios.get(`https://stablehorde.net/api/v2/generate/status/${id}`, { headers: hordeHeaders });
+            if (pollRes.data.generations && pollRes.data.generations.length > 0) {
+                imageBase64 = pollRes.data.generations[0].img;
+                break;
+            }
+        }
+
+        if (!imageBase64) {
+            return res.json({ success: false, message: "Image generation timed out" });
+        }
 
         // Optionally: Deduct credit, save transaction, etc.
 
