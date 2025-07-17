@@ -1,67 +1,71 @@
-const userModel = require("../models/userModel")
-const axios = require('axios')
+import React, { useState } from "react";
+import axios from "axios";
 
-exports.image = async (req, res) => {
+const ResultPage = () => {
+  const [prompt, setPrompt] = useState("");
+  const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
     try {
-        const { prompt } = req.body;
-        const userId = req.user.id; // Use authenticated user from JWT
-        const user = await userModel.findById(userId);
+      const token = localStorage.getItem("token");
 
-        if (!user || !prompt) {
-            return res.json({ success: false, message: "enter the required fields" });
+      if (!token) {
+        alert("You must be logged in to generate images.");
+        setLoading(false);
+        return;
+      }
+
+      const response = await axios.post(
+        "https://imagebackend-rk86.onrender.com/api/v1/image/generate-image",
+        { prompt },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-        if (user.creditBalance === 0) {
-            return res.json({ success: false, message: "insufficient balance" });
-        }
+      );
 
-        // Stable Horde API call
-        const hordeApiKey = process.env.STABLE_HORDE_API_KEY;
-        const hordeEndpoint = "https://stablehorde.net/api/v2/generate/async";
-
-        const hordePayload = {
-            prompt,
-            params: {
-                n: 1,
-                width: 512,
-                height: 512,
-                steps: 20,
-                sampler_name: "k_euler_ancestral"
-            }
-        };
-
-        const hordeHeaders = {
-            "Content-Type": "application/json",
-            "apikey": hordeApiKey
-        };
-
-        // Submit the generation request
-        const submitRes = await axios.post(hordeEndpoint, hordePayload, { headers: hordeHeaders });
-        const { id } = submitRes.data;
-
-        // Poll for the result (Stable Horde is async)
-        let imageBase64 = null;
-        for (let i = 0; i < 20; i++) {
-            await new Promise(r => setTimeout(r, 3000)); // wait 3 seconds
-            const pollRes = await axios.get(`https://stablehorde.net/api/v2/generate/status/${id}`, { headers: hordeHeaders });
-            if (pollRes.data.generations && pollRes.data.generations.length > 0) {
-                imageBase64 = pollRes.data.generations[0].img;
-                break;
-            }
-        }
-
-        if (!imageBase64) {
-            return res.json({ success: false, message: "Image generation timed out" });
-        }
-
-        // Optionally: Deduct credit, save transaction, etc.
-
-        return res.json({ success: true, image: `data:image/png;base64,${imageBase64}` });
-
+      if (response.data.success) {
+        setImage(response.data.image);
+      } else {
+        alert(response.data.message || "Image generation failed.");
+      }
     } catch (error) {
-        res.status(401).json({
-            message: "unable to produce image",
-            success: false,
-            error: error.message
-        });
+      console.error("Error generating image:", error);
+      alert("Unauthorized or error occurred. Check your login and token.");
+    } finally {
+      setLoading(false);
     }
-}
+  };
+
+  return (
+    <div>
+      <h2>Generate AI Image</h2>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Enter your image prompt"
+          required
+        />
+        <button type="submit" disabled={loading}>
+          {loading ? "Generating..." : "Generate Image"}
+        </button>
+      </form>
+
+      {image && (
+        <div>
+          <h3>Result:</h3>
+          <img src={image} alt="Generated" width="512" height="512" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ResultPage;
