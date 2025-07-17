@@ -39,23 +39,27 @@ exports.image = async (req, res) => {
         const { id } = submitRes.data;
 
         // Poll for the result (Stable Horde is async)
-        let imageBase64 = null;
+        let img = null;
         for (let i = 0; i < 20; i++) {
             await new Promise(r => setTimeout(r, 3000)); // wait 3 seconds
             const pollRes = await axios.get(`https://stablehorde.net/api/v2/generate/status/${id}`, { headers: hordeHeaders });
             if (pollRes.data.generations && pollRes.data.generations.length > 0) {
-                imageBase64 = pollRes.data.generations[0].img;
+                img = pollRes.data.generations[0].img;
                 break;
             }
         }
 
-        if (!imageBase64) {
+        if (!img) {
             return res.json({ success: false, message: "Image generation timed out" });
         }
 
-        // Optionally: Deduct credit, save transaction, etc.
-
-        return res.json({ success: true, image: `data:image/png;base64,${imageBase64}` });
+        if (img.startsWith('http')) {
+          // It's a URL, just return it
+          return res.json({ success: true, image: img });
+        } else {
+          // It's base64, return as data URL
+          return res.json({ success: true, image: `data:image/png;base64,${img}` });
+        }
 
     } catch (error) {
         console.error('Stable Horde error:', error.response?.data || error.message);
