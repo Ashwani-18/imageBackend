@@ -25,7 +25,7 @@ exports.image = async (req, res) => {
                 width: 512,
                 height: 512,
                 steps: 20,
-                sampler_name: "k_euler_ancestral"
+                sampler_name: "k_euler_a" // <-- use a valid sampler name
             }
         };
 
