@@ -11,6 +11,8 @@ const app = express();
 
 connectDB();
 app.use(express.json());
+app.use(cors()); // Enable CORS for all origins. For production, restrict origin as needed.
+ app.use(cors({ origin: 'https://imagefrontend-1.onrender.com', credentials: true }));
 app.use('/api/v1/auth', authRoute);
 app.use('/api/v1/image', imageRoute);
 app.use('/api/v1/transaction', transactionRoute);
