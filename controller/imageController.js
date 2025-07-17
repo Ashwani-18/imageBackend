@@ -58,6 +58,7 @@ exports.image = async (req, res) => {
         return res.json({ success: true, image: `data:image/png;base64,${imageBase64}` });
 
     } catch (error) {
+        console.error('Stable Horde error:', error.response?.data || error.message);
         res.status(401).json({
             message: "unable to produce image",
             success: false,
