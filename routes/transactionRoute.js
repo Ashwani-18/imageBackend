@@ -28,6 +28,7 @@ router.post('/create-order', auth, async (req, res) => {
     const order = await razorpay.orders.create(options);
     res.json({ success: true, order, credits: selected.credits });
   } catch (err) {
+    console.error('Order creation failed:', err); // Explicit error logging
     res.status(500).json({ success: false, message: 'Order creation failed', error: err.message });
   }
 });
