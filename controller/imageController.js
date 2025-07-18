@@ -64,7 +64,7 @@ exports.image = async (req, res) => {
     } catch (error) {
         console.error('Stable Horde error:', error.response?.data || error.message);
         res.status(401).json({
-            message: "unable to produce image",
+            message: "Try again, there are a lot of users generating images right now.",
             success: false,
             error: error.message
         });
